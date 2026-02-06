@@ -1,32 +1,41 @@
 # Spring Security Authorization (Reactive)
 
-Этот проект представляет собой демонстрационное приложение на **Spring Boot**, демонстрирующее механизмы **авторизации**
+Демонстрационное приложение на **Spring Boot 3.4.1**, показывающее механизмы **авторизации**
 в реактивном стеке (**Spring WebFlux**) с использованием **Spring Security**.
 
-## Основное назначение
+## Обзор и назначение
 
-Проект служит примером настройки прав доступа на уровне веб-запросов и на уровне методов в реактивном приложении. В нем
-реализованы:
+Проект — учебный пример настройки авторизации в реактивном Spring-приложении.
+Он демонстрирует:
 
-- Настройка цепочки фильтров безопасности (`SecurityWebFilterChain`).
-- Иерархия ролей (Role Hierarchy).
-- Защита методов с использованием аннотаций (`@PreAuthorize`).
-- Тестирование безопасности реактивных сервисов.
+- **URL-уровень**: настройку цепочки фильтров безопасности (`SecurityWebFilterChain`) с правилами доступа для различных
+  путей.
+- **Метод-уровень**: защиту бизнес-методов аннотацией `@PreAuthorize` в реактивном контексте.
+- **Иерархию ролей** (`RoleHierarchy`): роль `MANAGER` автоматически включает полномочия `VERIFIED_USER`.
+- **Иерархию полномочий**: `delete_posts > create_posts > view_posts`.
+- **AOP Advisor**: альтернативный (закомментированный) способ защиты методов без аннотаций — через
+  `AuthorizationManagerBeforeReactiveMethodInterceptor`.
+- **Тестирование**: проверку авторизации в реактивном контексте с помощью `@WithMockUser`, ручной установки
+  `ReactiveSecurityContextHolder` и `StepVerifier`.
+
+Бизнес-логика минимальна — есть единственный сервис `TodoService`, который создаёт задачу (`Todo`).
+Основной фокус — на **конфигурации безопасности и тестах**.
 
 ## Стек технологий
 
-- **Язык**: Java 21
-- **Фреймворк**: Spring Boot 3.4.1
-- **Модули**: Spring WebFlux, Spring Security
-- **Сборщик**: Maven
-- **Библиотеки для тестирования**: JUnit 5, Reactor Test, Spring Security Test
+| Компонент      | Версия / Описание                           |
+|----------------|---------------------------------------------|
+| Язык           | Java 21                                     |
+| Фреймворк      | Spring Boot 3.4.1                           |
+| Реактивный веб | Spring WebFlux                              |
+| Безопасность   | Spring Security                             |
+| Сборщик        | Maven 3.9.9 (через Maven Wrapper 3.3.2)     |
+| Тестирование   | JUnit 5, Reactor Test, Spring Security Test |
 
 ## Требования
 
-Для запуска проекта вам потребуются:
-
-- JDK 21 или выше.
-- Maven (или использование `mvnw`, входящего в проект).
+- **JDK 21** или выше
+- **Maven** 3.9+ (или используйте встроенный Maven Wrapper — `mvnw`)
 
 ## Настройка и запуск
 
@@ -42,83 +51,144 @@
 ./mvnw spring-boot:run
 ```
 
-По умолчанию приложение запускается на порту `8080`.
+По умолчанию приложение запускается на порту **8080**.
 
-## Описание настроенных бинов и безопасности
+> **Примечание:** В проекте не настроен `ReactiveUserDetailsService`, поэтому Spring Security
+> автоматически сгенерирует пароль для пользователя `user` (выведется в лог при запуске).
 
-### 1. `SecurityWebFilterChain`
+## Скрипты (Maven)
 
-Настроен в `ApplicationConfiguration`. Определяет правила доступа к различным URL:
+| Команда                  | Описание                                   |
+|--------------------------|--------------------------------------------|
+| `./mvnw clean package`   | Сборка проекта                             |
+| `./mvnw spring-boot:run` | Запуск приложения                          |
+| `./mvnw test`            | Запуск тестов                              |
+| `./mvnw clean install`   | Сборка и установка в локальный репозиторий |
 
-- `/api/orders/**` — требуется аутентификация.
-- `/permit-all` — доступно всем.
-- `/deny-all` — закрыто для всех.
-- `/has-authority`, `/has-admin-role` и др. — примеры проверок прав и ролей.
-- `/anonymous` — доступ только для неаутентифицированных пользователей.
-
-### 2. `RoleHierarchy` (Иерархия ролей)
-
-Определяет подчиненность ролей и полномочий:
-
-- `ROLE_MANAGER > ROLE_VERIFIED_USER` (Менеджер наследует права верифицированного пользователя).
-- `delete_posts > create_posts > view_posts` (Иерархия полномочий).
-
-### 3. Защита методов
-
-В проекте включена поддержка реактивной безопасности методов (`@EnableReactiveMethodSecurity`).
-
-- **`TodoService.create`**: защищен аннотацией `@PreAuthorize("hasRole('VERIFIED_USER')")`.
-
-### 4. `Advisor` (Инфраструктурный компонент)
-
-В `ApplicationConfiguration` есть закомментированный бин `protectCreateTodoMethodPointcut`, который показывает
-альтернативный способ настройки безопасности через AOP Advisor без использования аннотаций в сервисе.
-
-## Скрипты
-
-В корне проекта доступны стандартные скрипты Maven Wrapper:
-
-- `mvnw` / `mvnw.cmd` — запуск команд Maven без необходимости предустановки Maven в системе.
+Для Windows используйте `mvnw.cmd` вместо `./mvnw`.
 
 ## Переменные окружения
 
-На данный момент проект не использует специфичных переменных окружения. Все настройки находятся в
-`src/main/resources/application.properties`.
+На данный момент проект не использует специфичных переменных окружения.
+
+| Файл                                        | Описание                                       |
+|---------------------------------------------|------------------------------------------------|
+| `src/main/resources/application.properties` | Имя приложения (`spring.application.name`)     |
+| `src/test/resources/application.yml`        | Уровень логирования для тестов (`root: DEBUG`) |
+
+## Описание настроенных бинов
+
+Все бины определены в классе `ApplicationConfiguration`.
+
+### 1. SecurityWebFilterChain
+
+Определяет правила доступа на уровне HTTP-запросов. Порядок правил имеет значение — проверка останавливается на первом
+подходящем.
+
+| Путь / Правило        | Политика доступа                          |
+|-----------------------|-------------------------------------------|
+| `HEAD *`              | Запрещён (`denyAll`)                      |
+| `/api/orders/{id:\d}` | Требуется аутентификация                  |
+| `/api/orders?search`  | Требуется аутентификация                  |
+| `/api/**`             | Требуется аутентификация                  |
+| `GET /permit-all`     | Доступно всем (`permitAll`)               |
+| `/deny-all`           | Запрещён (`denyAll`)                      |
+| `/anonymous`          | Только неаутентифицированные пользователи |
+| `/authenticated`      | Требуется аутентификация                  |
+| `/has-authority`      | Требуется полномочие `view`               |
+| `/has-any-authority`  | Требуется `view` или `edit`               |
+| `/has-admin-role`     | Требуется роль `admin`                    |
+| `/has-any-role`       | Требуется роль `admin` или `user`         |
+
+> `AccessDeniedException` перехватывается `ExceptionTranslationWebFilter`.
+
+### 2. RoleHierarchy
+
+Настраивает иерархию ролей и полномочий:
+
+```text
+ROLE_MANAGER > ROLE_VERIFIED_USER
+delete_posts > create_posts
+create_posts > view_posts
+```
+
+Это означает, что пользователь с ролью `MANAGER` автоматически получает все права `VERIFIED_USER`,
+а обладатель `delete_posts` может также `create_posts` и `view_posts`.
+
+### 3. Реактивная безопасность методов (@EnableReactiveMethodSecurity)
+
+Включена поддержка аннотаций безопасности в реактивных методах.
+
+- **`TodoService.create(String)`** — защищён `@PreAuthorize("hasRole('VERIFIED_USER')")`.
+  Только пользователи с ролью `VERIFIED_USER` (или `MANAGER` — благодаря иерархии) могут создавать задачи.
+
+### 4. Advisor (закомментирован) — protectCreateTodoMethodPointcut
+
+Альтернативный способ настройки безопасности через AOP без аннотаций в сервисе.
+Использует `JdkRegexpMethodPointcut` + `AuthorizationManagerBeforeReactiveMethodInterceptor`.
+
+> ⚠️ **TODO:** Возможно, не поддерживает иерархию ролей.
+
+### 5. MethodSecurityExpressionHandler (закомментирован)
+
+Настраивает поддержку иерархии ролей в SpEL-выражениях безопасности.
+Актуален только при использовании AOP Advisor вместо аннотаций.
+
+> ⚠️ **TODO:** Исследовать корректность работы в контексте WebFlux.
 
 ## Тестирование
-
-Для запуска тестов используйте команду:
 
 ```bash
 ./mvnw test
 ```
 
-Основные тесты:
+### TodoServiceSecurityTests
 
-- `TodoServiceSecurityTests`: Проверяет работу `@PreAuthorize` в реактивном контексте с использованием `@WithMockUser` и
-  ручной настройки `SecurityContext`.
+Проверяет работу `@PreAuthorize` в реактивном контексте:
+
+| Тест                                        | Что проверяет                                                       |
+|---------------------------------------------|---------------------------------------------------------------------|
+| `testCreateWithMockUser_ReturnsCreatedTodo` | Успешное создание задачи с `@WithMockUser(roles = "VERIFIED_USER")` |
+| `testCreateWithValidRole`                   | Успешное создание через ручную установку `SecurityContext`          |
+| `testCreateWithInvalidRole`                 | `AccessDeniedException` при неверной роли (`USER`)                  |
+| `testCreateWithoutAuthentication`           | `AccessDeniedException` без аутентификации                          |
 
 ## Структура проекта
 
 ```text
-src/main/java/olga/springsecurity/authorization/
-├── ApplicationConfiguration.java       # Конфигурация безопасности и бинов
-├── SpringSecurityAuthorizationApplication.java # Точка входа
-├── Todo.java                           # Модель данных (Record)
-└── TodoService.java                    # Бизнес-логика с защитой методов
-
-src/test/java/olga/springsecurity/authorization/
-├── SpringSecurityAuthorizationApplicationTests.java
-└── TodoServiceSecurityTests.java       # Тесты авторизации
+spring-security-authorization/
+├── .mvn/wrapper/                               # Maven Wrapper
+├── src/
+│   ├── main/
+│   │   ├── java/olga/springsecurity/authorization/
+│   │   │   ├── SpringSecurityAuthorizationApplication.java  # Точка входа (main)
+│   │   │   ├── ApplicationConfiguration.java                # Конфигурация безопасности
+│   │   │   ├── Todo.java                                    # Record: name, id, owner
+│   │   │   └── TodoService.java                             # Сервис с @PreAuthorize
+│   │   └── resources/
+│   │       └── application.properties                       # Настройки приложения
+│   └── test/
+│       ├── java/olga/springsecurity/authorization/
+│       │   ├── SpringSecurityAuthorizationApplicationTests.java  # Тест контекста
+│       │   └── TodoServiceSecurityTests.java                    # Тесты авторизации
+│       └── resources/
+│           └── application.yml                              # Настройки тестов (DEBUG логи)
+├── mvnw / mvnw.cmd                            # Maven Wrapper скрипты
+├── pom.xml                                     # Конфигурация сборки
+└── README.md
 ```
 
 ## TODO
 
-- [ ] Доработать и протестировать поддержку иерархии ролей в закомментированном `Advisor`.
-- [ ] Добавить настройку `ReactiveUserDetailsService` для полноценного запуска в рантайме (сейчас используется
-  конфигурация по умолчанию или моки в тестах).
-- [ ] Исследовать использование `MethodSecurityExpressionHandler` в контексте WebFlux.
+- [ ] Добавить `ReactiveUserDetailsService` для полноценного запуска (сейчас используется автогенерация пароля или моки
+  в тестах).
+- [ ] Протестировать поддержку иерархии ролей в закомментированном `Advisor`.
+- [ ] Исследовать корректность `MethodSecurityExpressionHandler` в контексте WebFlux.
+- [ ] Добавить endpoint-контроллер (сейчас настроены только правила, но нет `@RestController`).
+- [ ] Раскомментировать и настроить `spring-boot-starter-data-r2dbc` для хранения данных.
 
 ## Лицензия
 
-Информация о лицензии не указана (см. `pom.xml`).
+Лицензия не указана. Смотрите `pom.xml` (секция `<licenses>` пуста).
+
+```
