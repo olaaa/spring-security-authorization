@@ -2,11 +2,13 @@ package olga.springsecurity.authorization;
 
 import org.springframework.aop.Advisor;
 import org.springframework.aop.support.JdkRegexpMethodPointcut;
-import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Role;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.authorization.AuthorityReactiveAuthorizationManager;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.method.AuthorizationManagerBeforeReactiveMethodInterceptor;
@@ -77,7 +79,8 @@ public class ApplicationConfiguration {
     }
 
     /**
-     * Советчик (advisor)
+     * Альтернатива:
+     * Вместо использования аннотаций можно создать Советчик (advisor)
      * CreateTodo -- это бизнесовый эндпоинт, который создаёт задачу(тудушку)
      * <p>
      * *Аннотация `@Role(BeanDefinition.ROLE_INFRASTRUCTURE)`**
@@ -89,9 +92,11 @@ public class ApplicationConfiguration {
      * - `*`: Любой возвращаемый тип.
      * - `olga.springsecurity.authorization.TodoService`: Полное имя целевого класса.
      * - `createTodo(**)`: Метод с любым списком параметров.
+     *
+     * TODO возможно не поддерживает иерархию ролей!
      */
-    @Bean
-    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+//    @Bean
+//    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
     static Advisor protectCreateTodoMethodPointcut() {
 //        перехват вызова определенного метода
         var jdkRegexpMethodPointcut = new JdkRegexpMethodPointcut();
@@ -100,6 +105,30 @@ public class ApplicationConfiguration {
         jdkRegexpMethodPointcut.setPattern("olga.springsecurity.authorization.TodoService.createTodo()");
 //    - Это AOP-интерсептор (перехватчик), который настраивается для выполнения проверок безопасности **до выполнения целевого метода**.
         return new AuthorizationManagerBeforeReactiveMethodInterceptor(jdkRegexpMethodPointcut,
-                AuthorityReactiveAuthorizationManager.hasRole("ADMIN"));
+                AuthorityReactiveAuthorizationManager.hasRole("VERIFIED_USER"));
+    }
+
+    /**
+     * Иерархия ролей
+     * левая роль расширяется правой ролью
+     * create_posts > view_posts -- не роли, а полномочия
+     */
+    @Bean
+    RoleHierarchy roleHierarchy() {
+//        RoleHierarchyUtils.roleHierarchyFromMap(); -- если получаем иерархию с внешнего источника
+        return RoleHierarchyImpl.fromHierarchy("""
+                ROLE_MANAGER > ROLE_VERIFIED_USER
+                delete_posts > create_posts
+                create_posts > view_posts""");
+    }
+
+    // TODO возможно этого нет в webflux. Хотя используется в
+    //  org.springframework.security.config.annotation.method.configuration.ReactiveAuthorizationManagerMethodSecurityConfiguration
+    // только в том случае, когда используем protectCreateTodoMethodPointcut!
+//    @Bean
+    MethodSecurityExpressionHandler methodSecurityExpressionHandler(RoleHierarchy roleHierarchy) {
+        DefaultMethodSecurityExpressionHandler expressionHandler = new DefaultMethodSecurityExpressionHandler();
+        expressionHandler.setRoleHierarchy(roleHierarchy);
+        return expressionHandler;
     }
 }
